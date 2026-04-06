@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_partner_manager_list" model="ir.ui.view">
+            <field name="name">partner.manager.list</field>
+            <field name="model">partner.manager</field>
+            <field name="arch" type="xml">
+                <list editable="bottom">
+                    <field name="x_customer_tier_id"/>
+                    <field name="x_salesperson_id"/>
+                    <field name="x_salesperson_ids" widget="many2many_tags"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_partner_manager_form" model="ir.ui.view">
+            <field name="name">partner.manager.form</field>
+            <field name="model">partner.manager</field>
+            <field name="arch" type="xml">
+                <form>
+                    <group>
+                        <field name="x_customer_tier_id"/>
+                        <field name="x_salesperson_id"/>
+                        <field name="x_salesperson_ids" widget="many2many_tags"/>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_partner_form_inherit" model="ir.ui.view">
+            <field name="name">view.partner.form.inherit</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='category_id']" position="after">
+                    <field name="x_contact_code"/>
+                    <field name="x_partner_type"/>
+                    <field name="x_partner_group"
+                           string="Nhóm đối tác"
+                           invisible="x_partner_type != 'partner'"
+                           required="x_partner_type == 'partner'"/>
+                    <field name="x_supplier_group"
+                           string="Nhóm đối tác"
+                           invisible="x_partner_type != 'supplier'"
+                           required="x_partner_type == 'supplier'"/>
+                </xpath>
+
+                <xpath expr="//div[hasclass('o_address_format')]" position="after">
+                    <field name="x_region" readonly="1" invisible="not x_region"/>
+                    <field name="x_birthday"/>
+                    <field name="x_identification_number"/>
+                </xpath>
+
+                <xpath expr="//field[@name='city']" position="attributes">
+                    <attribute name="placeholder">Xã</attribute>
+                </xpath>
+
+                <xpath expr="//field[@name='state_id']" position="attributes">
+                    <attribute name="placeholder">Tỉnh/Thành Phố</attribute>
+                </xpath>
+
+                <xpath expr="//page[@name='sales_purchases']//field[@name='user_id']" position="after">
+                    <field name="x_is_internal"/>
+                </xpath>
+
+                <xpath expr="//page[@name='sales_purchases']" position="after">
+                    <page string="Quản lý đối tác">
+                        <field name="partner_manager_ids" mode="list,form" context="{'default_partner_id': id}"/>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

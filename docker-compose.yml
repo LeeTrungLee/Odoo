@@ -1,0 +1,27 @@
+services:
+  odoo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: odoo19-app
+    restart: unless-stopped
+
+    ports:
+      - "8069:8069"
+      - "8072:8072"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      - odoo19-web-data:/var/lib/odoo
+      - ./config/odoo.conf:/etc/odoo/odoo.conf
+      - ./addons:/mnt/extra-addons
+      - ./my_addons:/mnt/my-addons
+
+    command: >
+      odoo
+      --config=/etc/odoo/odoo.conf
+
+volumes:
+  odoo19-web-data:

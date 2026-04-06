@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_custom_contact_agent_tier,access_custom_contact_agent_tier,model_agent_tier,base.group_user,1,1,1,1
+access_custom_contact_partner_manager,access_custom_contact_partner_manager,model_partner_manager,base.group_user,1,1,1,1
