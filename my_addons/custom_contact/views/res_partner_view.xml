@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
+        <!--        Quản lý đối tác-->
         <record id="view_partner_manager_list" model="ir.ui.view">
             <field name="name">partner.manager.list</field>
             <field name="model">partner.manager</field>
@@ -22,6 +23,36 @@
                         <field name="x_customer_tier_id"/>
                         <field name="x_salesperson_id"/>
                         <field name="x_salesperson_ids" widget="many2many_tags"/>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+
+        <!--        Công nợ-->
+        <record id="debt_partner_view_tree" model="ir.ui.view">
+            <field name="name">debt_partner_view_tree</field>
+            <field name="model">debt.partner</field>
+            <field name="arch" type="xml">
+                <list string="Công nợ">
+                    <field name="x_credit_limit"/>
+                    <field name="x_credit_used"/>
+                    <field name="x_credit_available"/>
+                    <field name="x_credit_overdue"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="debt_partner_view_form" model="ir.ui.view">
+            <field name="name">debt_partner_view_form</field>
+            <field name="model">debt.partner</field>
+            <field name="arch" type="xml">
+                <form string="Công nợ">
+                    <group>
+                        <field name="x_credit_limit"/>
+                        <field name="x_credit_used"/>
+                        <field name="x_credit_available"/>
+                        <field name="x_credit_overdue"/>
                     </group>
                 </form>
             </field>
@@ -66,6 +97,9 @@
                 <xpath expr="//page[@name='sales_purchases']" position="after">
                     <page string="Quản lý đối tác">
                         <field name="partner_manager_ids" mode="list,form" context="{'default_partner_id': id}"/>
+                    </page>
+                    <page string="Công nợ">
+                        <field name="partner_dept_ids" mode="list,form" context="{'default_partner_id': id}"/>
                     </page>
                 </xpath>
             </field>

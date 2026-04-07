@@ -14,6 +14,7 @@ class AgentTier(models.Model):
     active = fields.Boolean(default=True)
     partner_count = fields.Integer(string='Số khách thuộc hạng')
 
-    _sql_constraints = [
-        ("code", "unique(code)", "Mã hạng phải là duy nhất."),
-    ]
+    _code_unique = models.Constraint(
+        "UNIQUE(code)",
+        "Mã hạng phải là duy nhất.",
+    )

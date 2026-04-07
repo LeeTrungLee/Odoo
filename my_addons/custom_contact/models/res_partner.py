@@ -28,10 +28,12 @@ class ResPartner(models.Model):
     x_contact_code = fields.Char(string="Mã đối tác", copy=False, index=True, tracking=True)
     x_is_internal = fields.Boolean(string="Đối tượng nội bộ")
     partner_manager_ids = fields.One2many(comodel_name="partner.manager", inverse_name="partner_id", string="Quản lý đối tác")
+    partner_dept_ids = fields.One2many(comodel_name="debt.partner", inverse_name="partner_id" , string="Quản lý công nợ")
 
-    _sql_constraints = [
-        ("x_contact_code_unique", "unique(x_contact_code)", "Mã đối tác phải là duy nhất."),
-    ]
+    _x_contact_code_unique = models.Constraint(
+        "UNIQUE(x_contact_code)",
+        "Mã đối tác phải là duy nhất.",
+    )
 
     @api.onchange("x_partner_type")
     def _onchange_partner_type(self):
