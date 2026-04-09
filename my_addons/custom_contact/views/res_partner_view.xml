@@ -78,7 +78,7 @@
 
                 <xpath expr="//div[hasclass('o_address_format')]" position="after">
                     <field name="x_region" readonly="1" invisible="not x_region"/>
-                    <field name="x_birthday"/>
+                    <field name="x_birthday" options="{'numeric': true}"/>
                     <field name="x_identification_number"/>
                 </xpath>
 
@@ -101,6 +101,32 @@
                     <page string="Công nợ">
                         <field name="partner_dept_ids" mode="list,form" context="{'default_partner_id': id}"/>
                     </page>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="contacts.action_contacts" model="ir.actions.act_window">
+            <field name="view_mode">kanban,list,form,activity</field>
+            <field name="context">{'search_default_partner_supplier_filter': 1}</field>
+        </record>
+
+        <record id="contacts.action_contacts_view_kanban" model="ir.actions.act_window.view">
+            <field name="sequence" eval="0"/>
+        </record>
+
+        <record id="contacts.action_contacts_view_tree" model="ir.actions.act_window.view">
+            <field name="sequence" eval="1"/>
+        </record>
+
+        <record id="view_res_partner_filter_inherit_custom" model="ir.ui.view">
+            <field name="name">res.partner.search.inherit.custom</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_res_partner_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search" position="inside">
+                    <filter name="partner_supplier_filter"
+                            string="Khách hàng &amp; Nhà cung cấp"
+                            domain="[('x_partner_type', 'in', ['partner', 'supplier'])]"/>
                 </xpath>
             </field>
         </record>
