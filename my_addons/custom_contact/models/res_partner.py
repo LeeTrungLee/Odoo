@@ -98,7 +98,7 @@ class ResPartner(models.Model):
             phone = self._normalize_phone(rec.phone)
 
             if not phone:
-                raise ValidationError("Số điện thoại là bắt buộc")
+                continue
 
             if phone.startswith("+"):
                 phone_to_check = phone[1:]
@@ -221,18 +221,24 @@ class ResPartner(models.Model):
         return self.env["ir.sequence"].next_by_code("res.partner.contact.code")
 
     @api.model_create_multi
-    def create(self, vals):
-        for val in vals:
-            vat = (val.get("vat") or "").strip()
-            phone = self._normalize_phone_for_contact_code(val.get("phone"))
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get("x_partner_type") == "employee":
+                vals["x_is_internal"] = True
+            elif "x_partner_type" in vals:
+                vals["x_is_internal"] = False
+
+            vat = (vals.get("vat") or "").strip()
+            phone = self._normalize_phone_for_contact_code(vals.get("phone"))
 
             if vat:
-                val["x_contact_code"] = vat
+                vals["x_contact_code"] = vat
             elif phone:
-                val["x_contact_code"] = phone
-            elif not val.get("x_contact_code"):
-                val["x_contact_code"] = self._generate_contact_code()
-        return super().create(vals)
+                vals["x_contact_code"] = phone
+            elif not vals.get("x_contact_code"):
+                vals["x_contact_code"] = self._generate_contact_code()
+
+        return super().create(vals_list)
 
     def write(self, vals):
         result = True
@@ -243,8 +249,11 @@ class ResPartner(models.Model):
         for rec in self:
             write_vals = dict(vals)
 
+            if "x_partner_type" in write_vals:
+                write_vals["x_is_internal"] = write_vals["x_partner_type"] == "employee"
+
             if not user_updates_contact_code and touch_driver_fields:
-                new_priority_code = rec._get_contact_code_by_priority(vals)
+                new_priority_code = rec._get_contact_code_by_priority(write_vals)
 
                 if new_priority_code:
                     current_code = (rec.x_contact_code or "").strip()
