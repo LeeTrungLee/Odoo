@@ -64,7 +64,7 @@
             <field name="inherit_id" ref="base.view_partner_form"/>
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='category_id']" position="after">
-                    <field name="x_contact_code"/>
+                    <field name="x_contact_code" placeholder="Mã đối tác"/>
                     <field name="x_partner_type"/>
                     <field name="x_partner_group"
                            string="Nhóm đối tác"
@@ -78,8 +78,8 @@
 
                 <xpath expr="//div[hasclass('o_address_format')]" position="after">
                     <field name="x_region" readonly="1" invisible="not x_region"/>
-                    <field name="x_birthday" options="{'numeric': true}"/>
-                    <field name="x_identification_number"/>
+                    <field name="x_birthday" options="{'numeric': true}" placeholder="Ngày sinh"/>
+                    <field name="x_identification_number" placeholder="Số Căn Cước Công dân"/>
                 </xpath>
 
                 <xpath expr="//field[@name='city']" position="attributes">
@@ -88,6 +88,23 @@
 
                 <xpath expr="//field[@name='state_id']" position="attributes">
                     <attribute name="placeholder">Tỉnh/Thành Phố</attribute>
+                    <attribute name="required">is_company == True</attribute>
+                </xpath>
+
+                <xpath expr="//field[@name='street']" position="attributes">
+                    <attribute name="required">is_company == True</attribute>
+                </xpath>
+
+                <xpath expr="//field[@name='vat']" position="attributes">
+                    <attribute name="required">1</attribute>
+                </xpath>
+
+                <xpath expr="//field[@name='phone']" position="attributes">
+                    <attribute name="required">1</attribute>
+                </xpath>
+
+                <xpath expr="//field[@name='country_id']" position="attributes">
+                    <attribute name="required">is_company == True</attribute>
                 </xpath>
 
                 <xpath expr="//page[@name='sales_purchases']//field[@name='user_id']" position="after">
