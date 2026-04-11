@@ -4,29 +4,45 @@ from odoo import api, models
 class ResUsers(models.Model):
     _inherit = "res.users"
 
-    def _update_internal_partner(self):
+    def _prepare_internal_partner_vals(self, vals=None):
+        vals = vals or {}
+        partner_vals = {
+            "x_is_internal": True,
+            "x_partner_type": "employee",
+        }
+
+        if "phone" in vals:
+            partner_vals["phone"] = vals.get("phone") or False
+
+        if "email" in vals:
+            partner_vals["email"] = (vals.get("email") or "").strip() or False
+
+        return partner_vals
+
+    def _update_internal_partner(self, vals=None):
         for user in self:
-            if user.partner_id:
-                vals = {
-                    "x_is_internal": True,
-                    "x_partner_type": "employee",
-                }
+            if not user.partner_id:
+                continue
 
-                if "phone" in user._fields and user.phone:
-                    vals["phone"] = user.phone
+            partner_vals = self._prepare_internal_partner_vals(vals)
 
-                elif "login" in user._fields and user.login:
-                    vals["email"] = user.login
+            # Nếu create/write không truyền phone/email thì lấy từ user hiện tại
+            if "phone" not in partner_vals and "phone" in user._fields:
+                partner_vals["phone"] = user.phone or False
 
-                user.partner_id.sudo().write(vals)
+            if "email" not in partner_vals and "email" in user._fields:
+                partner_vals["email"] = (user.email or "").strip() or False
+
+            user.partner_id.sudo().write(partner_vals)
 
     @api.model_create_multi
     def create(self, vals_list):
         users = super().create(vals_list)
-        users._update_internal_partner()
+        for user, vals in zip(users, vals_list):
+            user._update_internal_partner(vals)
         return users
 
     def write(self, vals):
         res = super().write(vals)
-        self._update_internal_partner()
+        self._update_internal_partner(vals)
         return res

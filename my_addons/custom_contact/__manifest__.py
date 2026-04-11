@@ -7,7 +7,7 @@
     'category': 'Custom',
     'version': '19.1',
     'license': 'LGPL-3',
-    'depends': ['base', 'web', 'contacts', 'hr'],
+    'depends': ['base', 'web', 'contacts', 'hr', 'sale'],
     'data': [
         'security/ir.model.access.csv',
         'data/ir_sequence_data.xml',
