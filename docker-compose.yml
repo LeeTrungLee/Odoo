@@ -1,27 +1,47 @@
 services:
+  db:
+    image: postgres:15
+    container_name: odoo19-db
+    restart: unless-stopped
+    profiles: ["server"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - odoo19-db-data:/var/lib/postgresql/data
+
   odoo:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: odoo19-app
     restart: unless-stopped
-
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8069:8069"
       - "8072:8072"
-
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
     volumes:
       - odoo19-web-data:/var/lib/odoo
-      - ./config/odoo.conf:/etc/odoo/odoo.conf
+      - ./config/odoo.conf:/etc/odoo/odoo.conf:ro
       - ./addons:/mnt/extra-addons
       - ./my_addons:/mnt/my-addons
-
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
     command: >
+      sh -c "
       odoo
       --config=/etc/odoo/odoo.conf
+      --db_host=$$DB_HOST
+      --db_port=$$DB_PORT
+      --db_user=$$DB_USER
+      --db_password=$$DB_PASSWORD
+      "
 
 volumes:
   odoo19-web-data:
+  odoo19-db-data:
