@@ -48,20 +48,6 @@ services:
     networks:
       - odoo-net
 
-  nginx:
-    image: nginx:stable
-    container_name: odoo19-nginx
-    restart: unless-stopped
-    profiles: ["server"]
-    depends_on:
-      - odoo
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-    networks:
-      - odoo-net
-
 volumes:
   odoo19-web-data:
   odoo19-db-data:
