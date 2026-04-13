@@ -273,10 +273,10 @@ class ResPartner(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        for vals in vals_list:
-            if "x_partner_type" in vals:
-                vals["x_is_internal"] = vals["x_partner_type"] == "employee"
-        return super().create(vals_list)
+        partners = super().create(vals_list)
+        customer_partners = partners.filtered(lambda p: p.x_partner_type == "partner")
+        customer_partners._update_customer_tier()
+        return partners
 
     def write(self, vals):
         for rec in self:
@@ -289,103 +289,104 @@ class ResPartner(models.Model):
     @api.onchange('vat')
     def _onchange_vat(self):
         for rec in self:
-            vat = (rec.vat or '').strip()
+            if rec.is_company:
+                vat = (rec.vat or '').strip()
 
-            if not vat:
-                rec.name = False
+                if not vat:
+                    rec.name = False
+                    rec.street = False
+                    rec.city = False
+                    rec.state_id = False
+                    rec.country_id = False
+                    continue
+
+                try:
+                    response = requests.get(
+                        'https://mst.minvoice.com.vn/api/System/SearchTaxCodeV2',
+                        params={'tax': vat},
+                        timeout=10,
+                    )
+                    response.raise_for_status()
+                    data = response.json() or {}
+                except requests.RequestException:
+                    raise UserError(_('Không gọi được API tra cứu mã số thuế.'))
+
+                api_vat = (data.get('ma_so_thue') or data.get('masothue_id') or '').strip().upper()
+
+                if not data or api_vat != vat:
+                    raise UserError(_('Mã số thuế không chính xác.'))
+                rec.name = data.get('ten_cty') or False
+
+                full_address = (data.get('dia_chi') or '').strip()
                 rec.street = False
                 rec.city = False
                 rec.state_id = False
                 rec.country_id = False
-                continue
 
-            try:
-                response = requests.get(
-                    'https://mst.minvoice.com.vn/api/System/SearchTaxCodeV2',
-                    params={'tax': vat},
-                    timeout=10,
-                )
-                response.raise_for_status()
-                data = response.json() or {}
-            except requests.RequestException:
-                raise UserError(_('Không gọi được API tra cứu mã số thuế.'))
+                if full_address:
+                    parts = [p.strip() for p in full_address.split(',') if p.strip()]
 
-            api_vat = (data.get('ma_so_thue') or data.get('masothue_id') or '').strip().upper()
+                    if len(parts) >= 4:
+                        rec.street = ', '.join(parts[:-3])
+                        rec.city = parts[-3]
 
-            if not data or api_vat != vat:
-                raise UserError(_('Mã số thuế không chính xác.'))
-            rec.name = data.get('ten_cty') or False
+                        state_name = parts[-2]
+                        country_name = parts[-1]
 
-            full_address = (data.get('dia_chi') or '').strip()
-            rec.street = False
-            rec.city = False
-            rec.state_id = False
-            rec.country_id = False
+                        for prefix in ['Tỉnh ', 'Thành phố ', 'TP. ', 'TP ']:
+                            if state_name.startswith(prefix):
+                                state_name = state_name.replace(prefix, '', 1).strip()
+                                break
 
-            if full_address:
-                parts = [p.strip() for p in full_address.split(',') if p.strip()]
+                        country_code = 'VN' if country_name.lower() in ['việt nam', 'viet nam'] else country_name.upper()
+                        country = self.env['res.country'].sudo().search([
+                            '|',
+                            ('name', 'ilike', country_name),
+                            ('code', '=', country_code)
+                        ], limit=1)
 
-                if len(parts) >= 4:
-                    rec.street = ', '.join(parts[:-3])
-                    rec.city = parts[-3]
+                        if country:
+                            rec.country_id = country.id
 
-                    state_name = parts[-2]
-                    country_name = parts[-1]
+                        state_domain = [('name', 'ilike', state_name)]
+                        if rec.country_id:
+                            state_domain.append(('country_id', '=', rec.country_id.id))
 
-                    for prefix in ['Tỉnh ', 'Thành phố ', 'TP. ', 'TP ']:
-                        if state_name.startswith(prefix):
-                            state_name = state_name.replace(prefix, '', 1).strip()
-                            break
+                        state = self.env['res.country.state'].sudo().search(state_domain, limit=1)
+                        if state:
+                            rec.state_id = state.id
 
-                    country_code = 'VN' if country_name.lower() in ['việt nam', 'viet nam'] else country_name.upper()
-                    country = self.env['res.country'].sudo().search([
-                        '|',
-                        ('name', 'ilike', country_name),
-                        ('code', '=', country_code)
-                    ], limit=1)
+                    elif len(parts) == 3:
+                        rec.street = parts[0]
 
-                    if country:
-                        rec.country_id = country.id
+                        state_name = parts[1]
+                        country_name = parts[2]
 
-                    state_domain = [('name', 'ilike', state_name)]
-                    if rec.country_id:
-                        state_domain.append(('country_id', '=', rec.country_id.id))
+                        for prefix in ['Tỉnh ', 'Thành phố ', 'TP. ', 'TP ']:
+                            if state_name.startswith(prefix):
+                                state_name = state_name.replace(prefix, '', 1).strip()
+                                break
 
-                    state = self.env['res.country.state'].sudo().search(state_domain, limit=1)
-                    if state:
-                        rec.state_id = state.id
+                        country_code = 'VN' if country_name.lower() in ['việt nam', 'viet nam'] else country_name.upper()
 
-                elif len(parts) == 3:
-                    rec.street = parts[0]
+                        country = self.env['res.country'].sudo().search([
+                            '|',
+                            ('name', 'ilike', country_name),
+                            ('code', '=', country_code)
+                        ], limit=1)
 
-                    state_name = parts[1]
-                    country_name = parts[2]
+                        if country:
+                            rec.country_id = country.id
 
-                    for prefix in ['Tỉnh ', 'Thành phố ', 'TP. ', 'TP ']:
-                        if state_name.startswith(prefix):
-                            state_name = state_name.replace(prefix, '', 1).strip()
-                            break
+                        state_domain = [('name', 'ilike', state_name)]
+                        if rec.country_id:
+                            state_domain.append(('country_id', '=', rec.country_id.id))
 
-                    country_code = 'VN' if country_name.lower() in ['việt nam', 'viet nam'] else country_name.upper()
-
-                    country = self.env['res.country'].sudo().search([
-                        '|',
-                        ('name', 'ilike', country_name),
-                        ('code', '=', country_code)
-                    ], limit=1)
-
-                    if country:
-                        rec.country_id = country.id
-
-                    state_domain = [('name', 'ilike', state_name)]
-                    if rec.country_id:
-                        state_domain.append(('country_id', '=', rec.country_id.id))
-
-                    state = self.env['res.country.state'].sudo().search(state_domain, limit=1)
-                    if state:
-                        rec.state_id = state.id
-                else:
-                    rec.street = full_address
+                        state = self.env['res.country.state'].sudo().search(state_domain, limit=1)
+                        if state:
+                            rec.state_id = state.id
+                    else:
+                        rec.street = full_address
 
     @api.onchange("x_salesperson_id")
     def _onchange_x_salesperson_id(self):
@@ -424,10 +425,12 @@ class ResPartner(models.Model):
 
         for partner in self:
             total_amount = partner._get_confirmed_sale_amount()
+            currency = partner.company_id.currency_id or self.env.company.currency_id
 
             tier = Tier.search(
                 [
                     ("active", "=", True),
+                    ("currency_id", "=", currency.id),
                     ("min_sales_amount", "<=", total_amount),
                 ],
                 order="min_sales_amount desc, sequence asc, id asc",

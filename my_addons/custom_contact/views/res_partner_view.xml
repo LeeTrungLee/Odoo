@@ -40,6 +40,7 @@
 
                 <xpath expr="//field[@name='vat']" position="attributes">
                     <attribute name="required">1</attribute>
+                    <attribute name="placeholder">Mã số thuế</attribute>
                 </xpath>
 
                 <xpath expr="//field[@name='phone']" position="attributes">
@@ -73,12 +74,12 @@
                     <page string="Công nợ">
                         <group>
                             <group string="Hạn mức">
-                                <field name="x_credit_limit"/>
-                                <field name="x_credit_available"/>
+                                <field name="x_credit_limit" readonly="True"/>
+                                <field name="x_credit_available" readonly="True"/>
                             </group>
                             <group string="Công nợ">
-                                <field name="x_credit_used"/>
-                                <field name="x_credit_overdue"/>
+                                <field name="x_credit_used" readonly="True"/>
+                                <field name="x_credit_overdue" readonly="True"/>
                             </group>
                         </group>
                     </page>

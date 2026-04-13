@@ -1,4 +1,5 @@
-from odoo import api, fields, models
+from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError
 
 
 class AgentTier(models.Model):
@@ -11,7 +12,8 @@ class AgentTier(models.Model):
     sequence = fields.Integer(string='Thứ tự')
     description = fields.Text(string='Mô tả')
     min_sales_amount = fields.Monetary(string='Doanh số tối thiểu')
-    currency_id = fields.Many2one('res.currency', string='Tiền tệ')
+    currency_id = fields.Many2one('res.currency', string='Tiền tệ', default=lambda self: self.env.company.currency_id,
+                                  required=True)
     active = fields.Boolean(default=True)
     partner_count = fields.Integer(string='Số khách thuộc hạng', compute='_compute_partner_count')
 
@@ -35,3 +37,26 @@ class AgentTier(models.Model):
 
         for rec in self:
             rec.partner_count = count_map.get(rec.id, 0)
+
+    @api.constrains('sequence')
+    def _check_duplicate_sequence(self):
+        for rec in self:
+            if not rec.sequence:
+                continue
+
+            duplicate = self.search([('id', '!=', rec.id), ('sequence', '=', rec.sequence)], limit=1)
+
+            if duplicate:
+                raise ValidationError(_("Thứ tự hạng không được trùng. Giá trị '%s' đã tồn tại.") % rec.sequence)
+
+    @api.constrains('currency_id', 'min_sales_amount')
+    def _check_duplicate_min_sales_amount(self):
+        for rec in self:
+            if not rec.currency_id:
+                continue
+
+            duplicate = self.search([('id', '!=', rec.id), ('currency_id', '=', rec.currency_id.id),
+                                     ('min_sales_amount', '=', rec.min_sales_amount)], limit=1)
+
+            if duplicate:
+                raise ValidationError(_("Trong cùng một đơn vị tiền tệ, doanh số tối thiểu không được trùng nhau."))
