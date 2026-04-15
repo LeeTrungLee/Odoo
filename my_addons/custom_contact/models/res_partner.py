@@ -338,7 +338,8 @@ class ResPartner(models.Model):
                                 state_name = state_name.replace(prefix, '', 1).strip()
                                 break
 
-                        country_code = 'VN' if country_name.lower() in ['việt nam', 'viet nam'] else country_name.upper()
+                        country_code = 'VN' if country_name.lower() in ['việt nam',
+                                                                        'viet nam'] else country_name.upper()
                         country = self.env['res.country'].sudo().search([
                             '|',
                             ('name', 'ilike', country_name),
@@ -367,7 +368,8 @@ class ResPartner(models.Model):
                                 state_name = state_name.replace(prefix, '', 1).strip()
                                 break
 
-                        country_code = 'VN' if country_name.lower() in ['việt nam', 'viet nam'] else country_name.upper()
+                        country_code = 'VN' if country_name.lower() in ['việt nam',
+                                                                        'viet nam'] else country_name.upper()
 
                         country = self.env['res.country'].sudo().search([
                             '|',
@@ -407,18 +409,12 @@ class ResPartner(models.Model):
     def _get_confirmed_sale_amount(self):
         self.ensure_one()
 
-        commercial_partner = self.commercial_partner_id
+        orders = self.env["sale.order"].sudo().search([
+            ("partner_id", "child_of", self.commercial_partner_id.id),
+            ("state", "=", "sale"),
+        ])
 
-        groups = self.env["sale.order"].sudo().read_group(
-            domain=[
-                ("partner_id", "child_of", commercial_partner.id),
-                ("state", "=", "sale"),
-            ],
-            fields=["amount_total:sum"],
-            groupby=[],
-        )
-
-        return groups[0].get("amount_total", 0.0) if groups else 0.0
+        return sum(orders.mapped("amount_total"))
 
     def _update_customer_tier(self):
         Tier = self.env["agent.tier"].sudo()
@@ -437,7 +433,7 @@ class ResPartner(models.Model):
                 limit=1,
             )
 
-            partner.write({
+            partner.sudo().write({
                 "x_total_sales_amount": total_amount,
                 "x_customer_tier_id": tier.id if tier else False,
             })

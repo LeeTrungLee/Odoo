@@ -38,9 +38,8 @@
                     <attribute name="required">is_company == True</attribute>
                 </xpath>
 
-                <xpath expr="//field[@name='vat']" position="attributes">
-                    <attribute name="required">1</attribute>
-                    <attribute name="placeholder">Mã số thuế</attribute>
+                <xpath expr="//field[@name='vat']" position="replace">
+                    <field name="vat" required="1" placeholder="Mã số thuế"/>
                 </xpath>
 
                 <xpath expr="//field[@name='phone']" position="attributes">
@@ -74,7 +73,7 @@
                     <page string="Công nợ">
                         <group>
                             <group string="Hạn mức">
-                                <field name="x_credit_limit" readonly="True"/>
+                                <field name="x_credit_limit"/>
                                 <field name="x_credit_available" readonly="True"/>
                             </group>
                             <group string="Công nợ">
