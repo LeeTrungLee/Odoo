@@ -23,20 +23,40 @@ class AgentTier(models.Model):
     )
 
     def _compute_partner_count(self):
-        grouped_data = self.env['res.partner'].read_group(
-            domain=[('x_customer_tier_id', 'in', self.ids)],
-            fields=['x_customer_tier_id'],
-            groupby=['x_customer_tier_id'],
-        )
-
-        count_map = {
-            item['x_customer_tier_id'][0]: item['x_customer_tier_id_count']
-            for item in grouped_data
-            if item.get('x_customer_tier_id')
-        }
-
+        Partner = self.env['res.partner'].sudo()
         for rec in self:
-            rec.partner_count = count_map.get(rec.id, 0)
+            rec.partner_count = Partner.search_count([
+                ('x_customer_tier_id', '=', rec.id),
+                ('x_partner_type', '=', 'partner'),
+            ])
+
+    def write(self, vals):
+        tiers_to_archive = self.env['agent.tier']
+        partners_to_recompute = self.env['res.partner']
+
+        if 'active' in vals and vals.get('active') is False:
+            tiers_to_archive = self.filtered('active')
+
+            if tiers_to_archive:
+                partners_to_recompute = self.env['res.partner'].sudo().search([
+                    ('x_customer_tier_id', 'in', tiers_to_archive.ids),
+                ])
+
+        if 'active' in vals and vals.get('active') is True:
+            tiers_to_unarchive = self.filtered(lambda t: not t.active)
+            if tiers_to_unarchive:
+                for tier in tiers_to_unarchive:
+                    partners_to_recompute |= self.env['res.partner'].sudo().search([
+                        ('x_partner_type', '=', 'partner'),
+                        ('x_total_sales_amount', '>=', tier.min_sales_amount),
+                    ])
+
+        res = super().write(vals)
+
+        if partners_to_recompute:
+            partners_to_recompute.mapped('commercial_partner_id')._update_customer_tier()
+
+        return res
 
     @api.constrains('sequence')
     def _check_duplicate_sequence(self):
