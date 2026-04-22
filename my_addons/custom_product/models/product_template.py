@@ -7,28 +7,52 @@ class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
     export_bill = fields.Boolean(string='Xuất hóa đơn', default=True)
-    name_bill = fields.Text(string='Tên xuất hóa đơn')
+    name_bill = fields.Char(string='Tên xuất hóa đơn')
     is_attr = fields.Boolean(string='Có tồn tại thuộc tính', compute='_compute_is_attr', store=True)
 
     @api.model_create_multi
     def create(self, vals_list):
+        for vals in vals_list:
+            categ_id = vals.get('categ_id')
+            if not categ_id:
+                continue
+
+            categ = self.env['product.category'].browse(categ_id)
+            if categ and categ.attr_ids:
+                vals['barcode'] = False
+
         records = super(ProductTemplate, self).create(vals_list)
+
         for rec, vals in zip(records, vals_list):
             if rec.is_attr:
+                if rec.barcode:
+                    rec.write({'barcode': False})
                 continue
 
             if vals.get('barcode'):
                 continue
 
-            barcode = rec._generate_barcode()
-            if barcode:
-                rec.barcode = barcode
+            if not rec.barcode:
+                barcode = rec._generate_barcode()
+                if barcode:
+                    rec.write({'barcode': barcode})
+
         records._sync_attribute_line_sequence_by_category()
         records._generate_barcode_for_variants_if_needed()
         return records
 
     def write(self, vals):
+        if vals.get('categ_id'):
+            categ = self.env['product.category'].browse(vals['categ_id'])
+            if categ and categ.attr_ids:
+                vals['barcode'] = False
+
         res = super(ProductTemplate, self).write(vals)
+
+        for rec in self:
+            if rec.is_attr and rec.barcode:
+                rec.write({'barcode': False})
+
         if vals.get('barcode'):
             self._sync_attribute_line_sequence_by_category()
             self._generate_barcode_for_variants_if_needed()
@@ -41,11 +65,17 @@ class ProductTemplate(models.Model):
             if not rec.barcode:
                 barcode = rec._generate_barcode()
                 if barcode:
-                    rec.barcode = barcode
+                    rec.write({'barcode': barcode})
 
         self._sync_attribute_line_sequence_by_category()
         self._generate_barcode_for_variants_if_needed()
         return res
+
+    @api.onchange('categ_id')
+    def _onchange_categ_id_clear_barcode_when_has_attr(self):
+        for rec in self:
+            if rec.categ_id and rec.categ_id.attr_ids:
+                rec.barcode = False
 
     def _generate_barcode(self):
         self.ensure_one()
@@ -91,6 +121,15 @@ class ProductTemplate(models.Model):
         for rec in self:
             variants = rec.product_variant_ids.filtered(lambda v: v.active)
 
+            if rec.is_attr:
+                for variant in variants:
+                    if variant.barcode:
+                        continue
+
+                    barcode = rec._generate_barcode()
+                    if barcode:
+                        variant.barcode = barcode
+                continue
             if len(variants) <= 1:
                 continue
 
@@ -108,6 +147,14 @@ class ProductTemplate(models.Model):
             barcode = (rec.barcode or '').strip()
             if not barcode:
                 continue
+            if rec.is_attr:
+                continue
+
+            if not barcode.isdigit():
+                raise ValidationError(_('Mã vạch chỉ được nhập số.'))
+
+            if len(barcode) != 13:
+                raise ValidationError(_('Mã vạch phải gồm đúng 13 số.'))
 
             duplicate = self.search([
                 ('id', '!=', rec.id),
@@ -117,12 +164,15 @@ class ProductTemplate(models.Model):
             if duplicate:
                 raise ValidationError(_('Mã vạch không được trùng nhau.'))
 
-            if not barcode.isdigit():
-                raise ValidationError(_('Mã vạch chỉ được chưa các số.'))
-
-            if len(barcode) != 13:
-                raise ValidationError(_('Mã vạch phải gồm đúng 13 số.'))
-
+    @api.constrains('barcode', 'is_attr')
+    def _check_template_barcode_when_has_attr(self):
+        for rec in self:
+            barcode = (rec.barcode or '').strip()
+            if rec.is_attr and barcode:
+                raise ValidationError(_(
+                    'Danh mục có cấu hình thuộc tính thì không được nhập barcode ở sản phẩm cha. '
+                    'Vui lòng khai báo barcode ở cấp biến thể.'
+                ))
 
     @api.depends('categ_id')
     def _compute_is_attr(self):
@@ -174,3 +224,60 @@ class ProductTemplate(models.Model):
                 new_sequence = config_sequence_map.get(attr_line.attribute_id.id)
                 if new_sequence is not None and attr_line.sequence != new_sequence:
                     attr_line.write({'sequence': new_sequence})
+
+    @api.depends(
+        'product_variant_ids',
+        'product_variant_ids.default_code',
+        'attribute_line_ids',
+        'attribute_line_ids.value_ids',
+        'attribute_line_ids.attribute_id',
+        'attribute_line_ids.attribute_id.is_degree',
+        'attribute_line_ids.attribute_id.symbol_degree',
+    )
+    def _compute_default_code(self):
+        super()._compute_default_code()
+
+        for rec in self:
+            if not rec.product_variant_ids:
+                rec.default_code = False
+                continue
+
+            if rec.attribute_line_ids:
+                code = rec._build_default_code_from_attributes()
+                if code:
+                    rec.default_code = code
+
+    def _build_default_code_from_attributes(self):
+        self.ensure_one()
+
+        degree_parts = []
+        normal_parts = []
+
+        for line in self.attribute_line_ids.sorted(lambda l: l.sequence):
+            attribute = line.attribute_id
+            if not line.value_ids:
+                continue
+
+            values = line.value_ids.sorted(lambda v: v.sequence)
+
+            for value in values:
+                text = value.name or ''
+                if not text:
+                    continue
+
+                if attribute and attribute.is_degree:
+                    symbol = attribute.symbol_degree or ''
+                    text = f'{symbol}{text}' if symbol else text
+                    degree_parts.append(text)
+                else:
+                    normal_parts.append(text)
+
+        result_parts = []
+
+        if degree_parts:
+            result_parts.append(f"({', '.join(degree_parts)})")
+
+        if normal_parts:
+            result_parts.append(' '.join(normal_parts))
+
+        return ' '.join(result_parts) if result_parts else False
