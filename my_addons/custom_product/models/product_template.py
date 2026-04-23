@@ -42,16 +42,27 @@ class ProductTemplate(models.Model):
         return records
 
     def write(self, vals):
+        new_barcode = None
+        if 'barcode' in vals:
+            new_barcode = (vals.get('barcode') or '').strip()
+
         if vals.get('categ_id'):
             categ = self.env['product.category'].browse(vals['categ_id'])
             if categ and categ.attr_ids:
                 vals['barcode'] = False
 
+        if 'barcode' in vals:
+            for rec in self:
+                if rec.is_attr:
+                    continue
+                if rec.barcode and not new_barcode:
+                    raise ValidationError(_('Không được để trống mã vạch'))
+
         res = super(ProductTemplate, self).write(vals)
 
         for rec in self:
             if rec.is_attr and rec.barcode:
-                rec.write({'barcode': False})
+                rec.barcode = False
 
         if vals.get('barcode'):
             self._sync_attribute_line_sequence_by_category()
@@ -65,7 +76,7 @@ class ProductTemplate(models.Model):
             if not rec.barcode:
                 barcode = rec._generate_barcode()
                 if barcode:
-                    rec.write({'barcode': barcode})
+                    rec.barcode = barcode
 
         self._sync_attribute_line_sequence_by_category()
         self._generate_barcode_for_variants_if_needed()
@@ -281,3 +292,19 @@ class ProductTemplate(models.Model):
             result_parts.append(' '.join(normal_parts))
 
         return ' '.join(result_parts) if result_parts else False
+
+    @api.constrains('default_code')
+    def _check_unique_default_code(self):
+        for rec in self:
+            default_code = (rec.default_code or '').strip()
+            if not default_code:
+                continue
+
+            duplicate = self.search([
+                ('id', '!=', rec.id),
+                ('default_code', '=', default_code),
+            ], limit=1)
+
+            if duplicate:
+                raise ValidationError(
+                    _('Mã tham chiếu "%s" đã tồn tại ở sản phẩm "%s".') % (default_code, duplicate.display_name))
